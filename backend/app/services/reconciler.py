@@ -149,6 +149,8 @@ class MultiSourceReconciler:
 
     def __init__(self, session: Session):
         self.session = session
+        if hasattr(self.session, "expire_on_commit"):
+            self.session.expire_on_commit = False
         self.product_repo = ProductRepository(session)
         self.attr_repo = AttributeRepository(session)
         self.normalizer = AttributeNormalizer()
@@ -374,6 +376,7 @@ class MultiSourceReconciler:
         competing_names = ", ".join(f"{c.raw_value} ({c.source_name})" for c in competing)
 
         # Update ProductAttribute status to conflicting without overwriting canonical values
+        prod_id = product.id
         attribute.status = AttributeStatus.conflicting
         attribute.updated_at = datetime.now(timezone.utc)
         self.session.add(attribute)
@@ -381,7 +384,7 @@ class MultiSourceReconciler:
 
         # Idempotent ValidationResult Conflict Registration
         self._register_cross_source_conflict_validation(
-            product_id=product.id,
+            product_id=prod_id,
             attribute=attribute,
             winning_claim=winning_claim,
             competing_claims=competing,
