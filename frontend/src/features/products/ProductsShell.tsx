@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Database, AlertTriangle, FileText, CheckCircle2 } from 'lucide-react';
 import { ValidationPanel } from './ValidationPanel';
+import { MultiSourceReconciliationPanel } from './MultiSourceReconciliationPanel';
 import { EnrichmentPanel } from './EnrichmentPanel';
 
 interface ProductItem {
@@ -321,6 +322,12 @@ export const ProductsShell: React.FC = () => {
               qualityScore={selectedProduct.quality_score}
               issues={validationIssues}
               onResolutionCompleted={fetchProducts}
+            />
+
+            {/* Multi-Source Reconciliation Panel */}
+            <MultiSourceReconciliationPanel
+              productId={selectedProduct.id}
+              onRefreshRequested={fetchProducts}
             />
 
             {/* AI Commerce Enrichment Panel */}
