@@ -153,6 +153,10 @@ def test_enrichment_stage_failure_handling(session: Session):
         def model_name(self) -> str:
             return "failing-model"
 
+        @property
+        def prompt_version(self) -> str:
+            return "v1.0"
+
         def extract(self, prompt: str, schema: dict) -> dict:
             raise RuntimeError("API quota exceeded")
 

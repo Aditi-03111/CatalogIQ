@@ -1291,6 +1291,15 @@ class EnrichmentStage(PipelineStage):
         session.commit()
         logger.info(f"EnrichmentStage completed for product {product.id}: status={enrich_status.value}, conf={enrich_conf}")
 
+        # ---- 12. Trigger safe search indexing ----
+        try:
+            from app.services.indexing import IndexingService
+            indexer = IndexingService(session)
+            indexer.index_product(product.id)
+            logger.info(f"Auto-indexed product {product.id} into search index post-enrichment")
+        except Exception as idx_err:
+            logger.warning(f"Post-enrichment search indexing failed for product {product.id} (non-fatal): {idx_err}")
+
 
 # ---------------------------------------------------------------------------
 # DocumentProcessingService — orchestrates all stages

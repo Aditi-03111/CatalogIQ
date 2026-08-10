@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Database, AlertTriangle, FileText, CheckCircle2 } from 'lucide-react';
 import { ValidationPanel } from './ValidationPanel';
 import { EnrichmentPanel } from './EnrichmentPanel';
@@ -38,6 +39,9 @@ interface EvidenceItem {
 }
 
 export const ProductsShell: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const paramProductId = searchParams.get('product_id');
+
   const [products, setProducts] = useState<ProductItem[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
   const [attributes, setAttributes] = useState<ProductAttributeItem[]>([]);
@@ -58,7 +62,7 @@ export const ProductsShell: React.FC = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [paramProductId]);
 
   const fetchProducts = async () => {
     try {
@@ -68,13 +72,15 @@ export const ProductsShell: React.FC = () => {
         const data: ProductItem[] = await res.json();
         setProducts(data);
         if (data.length > 0) {
-          // Preserve currently selected product if available, otherwise select the first product
-          setSelectedProduct((current) => {
-            const match = current ? data.find((p) => p.id === current.id) : null;
-            const target = match || data[0];
-            selectProduct(target);
-            return target;
-          });
+          let target = data[0];
+          if (paramProductId) {
+            const paramMatch = data.find((p) => p.id === paramProductId);
+            if (paramMatch) target = paramMatch;
+          } else if (selectedProduct) {
+            const currentMatch = data.find((p) => p.id === selectedProduct.id);
+            if (currentMatch) target = currentMatch;
+          }
+          selectProduct(target);
         }
       }
     } catch (err) {

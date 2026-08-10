@@ -44,7 +44,9 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-3.6-flash"
 
     # --- Embedding ---
+    EMBEDDING_PROVIDER: str = "fastembed"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+    QDRANT_COLLECTION_NAME: str = "catalogiq_products"
 
     # --- Extraction Versioning ---
     # Changing any of these will invalidate the extraction cache for all documents.
