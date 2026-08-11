@@ -7,15 +7,9 @@ import { UploadShell } from './features/upload/UploadShell';
 import { JobsShell } from './features/jobs/JobsShell';
 import { SearchShell } from './features/search/SearchShell';
 import { ReviewsShell } from './features/reviews/ReviewsShell';
+import { HealthShell } from './features/health/HealthShell';
 
-// Stub routes for health, settings
-const HealthStub = () => (
-  <div>
-    <h2 className="text-3xl font-bold tracking-tight">Catalog Health</h2>
-    <p className="text-muted-foreground mt-2">Overall health score, completeness rate, validation checks, and warnings.</p>
-  </div>
-);
-
+// Stub route for settings
 const SettingsStub = () => (
   <div>
     <h2 className="text-3xl font-bold tracking-tight">System Settings</h2>
@@ -37,7 +31,7 @@ function App() {
             <Route path="jobs" element={<JobsShell />} />
             <Route path="search" element={<SearchShell />} />
             <Route path="reviews" element={<ReviewsShell />} />
-            <Route path="health" element={<HealthStub />} />
+            <Route path="health" element={<HealthShell />} />
             <Route path="settings" element={<SettingsStub />} />
           </Route>
         </Routes>
