@@ -6,15 +6,9 @@ import { ProductsShell } from './features/products/ProductsShell';
 import { UploadShell } from './features/upload/UploadShell';
 import { JobsShell } from './features/jobs/JobsShell';
 import { SearchShell } from './features/search/SearchShell';
+import { ReviewsShell } from './features/reviews/ReviewsShell';
 
-// Stub routes for review, health, settings
-const ReviewsStub = () => (
-  <div>
-    <h2 className="text-3xl font-bold tracking-tight">Human Review Queue</h2>
-    <p className="text-muted-foreground mt-2">Approve/reject extracted attributes and resolve validation conflicts.</p>
-  </div>
-);
-
+// Stub routes for health, settings
 const HealthStub = () => (
   <div>
     <h2 className="text-3xl font-bold tracking-tight">Catalog Health</h2>
@@ -42,7 +36,7 @@ function App() {
             <Route path="upload" element={<UploadShell />} />
             <Route path="jobs" element={<JobsShell />} />
             <Route path="search" element={<SearchShell />} />
-            <Route path="reviews" element={<ReviewsStub />} />
+            <Route path="reviews" element={<ReviewsShell />} />
             <Route path="health" element={<HealthStub />} />
             <Route path="settings" element={<SettingsStub />} />
           </Route>

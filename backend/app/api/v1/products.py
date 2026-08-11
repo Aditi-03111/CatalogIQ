@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import Session, select, desc
 
 from app.db.session import get_session
 from app.models import (
@@ -361,6 +361,24 @@ def rerun_product_enrichment(product_id: uuid.UUID, session: Session = Depends(g
     }
 
 
+from app.models import (
+    AttributeEvidence,
+    AttributeStatus,
+    AuditLog,
+    Document,
+    EnrichmentResult,
+    Product,
+    ProductAttribute,
+    ProductDocumentAssociation,
+    ProductStatus,
+    ProductVersion,
+    Source,
+    SourceType,
+    ValidationResult,
+    ValidationStatus,
+)
+
+
 @router.post("/{product_id}/validation/{validation_id}/resolve")
 def resolve_validation_issue(
     product_id: uuid.UUID,
@@ -383,30 +401,106 @@ def resolve_validation_issue(
     val_record = session.get(ValidationResult, validation_id)
     if not val_record or val_record.product_id != product_id:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Validation result {validation_id} not found for product {product_id}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Validation result {validation_id} does not belong to product {product_id}",
         )
 
+    # Scoping check on associated attribute
+    attr: Optional[ProductAttribute] = None
+    if val_record.attribute_id:
+        attr = session.get(ProductAttribute, val_record.attribute_id)
+        if attr and attr.product_id != product_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Attribute {val_record.attribute_id} does not belong to product {product_id}",
+            )
+
+    # Idempotency check: handle already resolved validation issues
+    if val_record.status == ValidationStatus.resolved:
+        stmt = (
+            select(AuditLog)
+            .where(
+                AuditLog.entity_type == "validation_result",
+                AuditLog.entity_id == validation_id,
+            )
+            .order_by(desc(AuditLog.created_at))
+        )
+        last_audit = session.exec(stmt).first()
+
+        prev_resolution = last_audit.metadata_json.get("resolution") if last_audit and isinstance(last_audit.metadata_json, dict) else None
+
+        if prev_resolution == request.resolution:
+            return {
+                "status": "already_resolved",
+                "message": "Validation result was already resolved with identical decision.",
+                "validation_id": str(validation_id),
+                "product_id": str(product_id),
+                "quality_score": product.quality_score,
+                "product_status": product.status,
+            }
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Validation issue {validation_id} is already resolved with '{prev_resolution or 'resolved'}'. Changing resolution decision requires reopening the issue.",
+            )
+
     now = datetime.now(timezone.utc)
+
+    # Determine resolution value and source_id provenance
+    selected_source_id: Optional[str] = None
+    resolved_val: Optional[str] = None
+
+    if request.resolution == "accept_source_a":
+        if isinstance(val_record.expected_value, dict) and "raw_value" in val_record.expected_value:
+            resolved_val = str(val_record.expected_value["raw_value"])
+            selected_source_id = str(val_record.expected_value.get("source_id")) if val_record.expected_value.get("source_id") else None
+        elif val_record.actual_value is not None and not isinstance(val_record.actual_value, (dict, list)):
+            resolved_val = str(val_record.actual_value)
+        elif request.resolved_value is not None:
+            resolved_val = str(request.resolved_value)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot determine Source A claim value for this validation issue.",
+            )
+
+    elif request.resolution == "accept_source_b":
+        if isinstance(val_record.actual_value, list) and len(val_record.actual_value) > 0 and isinstance(val_record.actual_value[0], dict) and "raw_value" in val_record.actual_value[0]:
+            resolved_val = str(val_record.actual_value[0]["raw_value"])
+            selected_source_id = str(val_record.actual_value[0].get("source_id")) if val_record.actual_value[0].get("source_id") else None
+        elif val_record.expected_value is not None and not isinstance(val_record.expected_value, (dict, list)):
+            resolved_val = str(val_record.expected_value)
+        elif request.resolved_value is not None:
+            resolved_val = str(request.resolved_value)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot determine Source B claim value for this validation issue.",
+            )
+
+    elif request.resolution in ["custom_value", "custom"]:
+        if request.resolved_value is not None and str(request.resolved_value).strip() != "":
+            resolved_val = str(request.resolved_value).strip()
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Resolved value must be provided for custom_value resolution.",
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported resolution type '{request.resolution}'. Allowed types: accept_source_a, accept_source_b, custom_value, custom.",
+        )
 
     # Create version snapshot BEFORE resolution
     product_service = ProductService(session)
 
-    # If associated attribute value is updated by resolution
-    if val_record.attribute_id:
-        attr = session.get(ProductAttribute, val_record.attribute_id)
-        if attr:
-            old_value = attr.raw_value
-            new_value = request.resolved_value if request.resolved_value is not None else old_value
-            if request.resolution == "accept_source_a" and val_record.actual_value:
-                new_value = str(val_record.actual_value)
-            elif request.resolution == "accept_source_b" and val_record.expected_value:
-                new_value = str(val_record.expected_value)
-
-            attr.raw_value = str(new_value)
-            attr.status = ProductStatus.verified
-            attr.updated_at = now
-            session.add(attr)
+    # Update ProductAttribute if associated
+    if attr:
+        attr.raw_value = resolved_val
+        attr.status = AttributeStatus.verified
+        attr.updated_at = now
+        session.add(attr)
 
     # Mark validation as resolved
     val_record.status = ValidationStatus.resolved
@@ -414,21 +508,22 @@ def resolve_validation_issue(
     val_record.resolved_by = "human_reviewer"
     session.add(val_record)
 
-    # Audit log
+    # Audit log entry with resolution, resolved_value, selected_source_id, and notes
     audit = AuditLog(
         entity_type="validation_result",
         entity_id=validation_id,
         action="human_resolution",
-        changes={
+        actor_type="user",
+        metadata_json={
             "resolution": request.resolution,
-            "resolved_value": request.resolved_value,
+            "resolved_value": resolved_val,
+            "selected_source_id": selected_source_id,
             "notes": request.notes,
         },
-        actor_type="human",
     )
     session.add(audit)
 
-    # Recalculate quality score
+    # Recalculate quality score and product status via ValidationEngine
     attributes = repo.get_attributes(product_id)
     attr_repo = AttributeRepository(session)
     evidence = attr_repo.get_evidence_for_product(product_id)

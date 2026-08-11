@@ -9,6 +9,8 @@ from app.api.v1.products import router as products_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.jobs import router as jobs_router
 from app.api.v1.search import router as search_router
+from app.api.v1.overview import router as overview_router
+from app.api.v1.reviews import router as reviews_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -33,6 +35,8 @@ app.include_router(products_router, prefix="/api/v1", tags=["Products"])
 app.include_router(documents_router, prefix="/api/v1", tags=["Documents"])
 app.include_router(jobs_router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(search_router, prefix="/api/v1", tags=["Search"])
+app.include_router(overview_router, prefix="/api/v1", tags=["Overview"])
+app.include_router(reviews_router, prefix="/api/v1", tags=["Reviews"])
 
 @app.get("/")
 def read_root():
