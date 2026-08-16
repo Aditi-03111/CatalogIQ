@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlmodel import Session, select, desc
 
@@ -142,6 +143,49 @@ def get_product(product_id: uuid.UUID, session: Session = Depends(get_session)):
     product_dict = product.model_dump()
     product_dict["attributes"] = formatted_attributes
     return product_dict
+
+@router.get("/{product_id}/export-pdf")
+def download_product_pdf(product_id: uuid.UUID, session: Session = Depends(get_session)):
+    """Generates and downloads an official PDF specification sheet for a product."""
+    from app.services.pdf_exporter import generate_product_pdf
+    
+    repo = ProductRepository(session)
+    product = repo.get_by_id(product_id)
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product with ID {product_id} not found",
+        )
+
+    attributes = repo.get_attributes(product_id)
+    attr_list = []
+    for a in attributes:
+        attr_list.append({
+            "label": a.display_name or a.attribute_name,
+            "value": a.raw_value,
+            "uom": a.unit or "",
+            "status": a.status.value if hasattr(a.status, "value") else str(a.status)
+        })
+
+    enriched_data = {
+        "manufacturer_name": product.brand,
+        "brand_name": product.brand,
+        "manufacturer_part_number": product.sku,
+        "classpath": f"{product.category} > {product.subcategory}" if product.subcategory else product.category,
+        "short_desc": product.product_name,
+        "long_desc": product.description or "",
+        "attributes": attr_list,
+        "features": product.features or []
+    }
+
+    pdf_bytes = generate_product_pdf(enriched_data)
+    filename = f"CatalogIQ_Product_{product.sku or 'SpecSheet'}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 
 @router.get("/{product_id}/attributes", response_model=List[ProductAttribute])

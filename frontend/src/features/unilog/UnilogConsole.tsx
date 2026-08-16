@@ -8,7 +8,8 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  FileText
 } from 'lucide-react';
 import { formatAttrValueAndUnit } from '../../lib/formatters';
 
@@ -129,6 +130,15 @@ export const UnilogConsole: React.FC = () => {
   // Download export CSV
   const handleExport = () => {
     window.open('/api/v1/unilog/export', '_blank');
+  };
+
+  // Download export PDF
+  const handleExportPdf = () => {
+    window.open('/api/v1/unilog/export-pdf', '_blank');
+  };
+
+  const handleRecordPdf = (recordId: string) => {
+    window.open(`/api/v1/unilog/records/${recordId}/export-pdf`, '_blank');
   };
 
   // Approve a record flagged for human review
@@ -313,14 +323,24 @@ export const UnilogConsole: React.FC = () => {
             </div>
           </div>
           
-          <button 
-            onClick={handleExport}
-            disabled={metrics?.enriched_records === 0}
-            className="bg-foreground hover:bg-foreground/80 text-background text-[10.5px] font-bold px-5 py-2.5 rounded-none flex items-center gap-2 transition disabled:opacity-40 w-full sm:w-auto justify-center"
-          >
-            <Download className="w-4 h-4 text-[#FF3B00]" />
-            <span>EXPORT DELIVERY CSV</span>
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button 
+              onClick={handleExport}
+              disabled={metrics?.enriched_records === 0}
+              className="bg-foreground hover:bg-foreground/80 text-background text-[10.5px] font-bold px-4 py-2.5 rounded-none flex items-center gap-2 transition disabled:opacity-40 flex-1 sm:flex-initial justify-center"
+            >
+              <Download className="w-4 h-4 text-[#FF3B00]" />
+              <span>EXPORT DELIVERY CSV</span>
+            </button>
+            <button 
+              onClick={handleExportPdf}
+              disabled={metrics?.enriched_records === 0}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-bold px-4 py-2.5 rounded-none flex items-center gap-2 transition disabled:opacity-40 flex-1 sm:flex-initial justify-center"
+            >
+              <FileText className="w-4 h-4 text-emerald-200" />
+              <span>EXPORT PDF REPORT</span>
+            </button>
+          </div>
         </div>
 
         {/* Data list table */}
@@ -402,16 +422,28 @@ export const UnilogConsole: React.FC = () => {
                                 </div>
                               </div>
                               
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleApproveRecord(rec.id);
-                                }}
-                                className="bg-foreground hover:bg-foreground/80 text-background text-[9.5px] font-bold px-4 py-2 rounded-none flex items-center gap-1.5 transition whitespace-nowrap"
-                              >
-                                <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
-                                <span>APPROVE SKU</span>
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRecordPdf(rec.id);
+                                  }}
+                                  className="bg-emerald-700/30 hover:bg-emerald-700/50 text-emerald-300 border border-emerald-500/40 text-[9.5px] font-bold px-3 py-2 rounded-none flex items-center gap-1.5 transition whitespace-nowrap"
+                                >
+                                  <FileText className="w-3.5 h-3.5" />
+                                  <span>DOWNLOAD PDF</span>
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleApproveRecord(rec.id);
+                                  }}
+                                  className="bg-foreground hover:bg-foreground/80 text-background text-[9.5px] font-bold px-4 py-2 rounded-none flex items-center gap-1.5 transition whitespace-nowrap"
+                                >
+                                  <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
+                                  <span>APPROVE SKU</span>
+                                </button>
+                              </div>
                             </div>
                           )}
 

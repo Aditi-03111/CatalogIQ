@@ -3,7 +3,7 @@ import uuid
 import csv
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, Query, BackgroundTasks, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlmodel import Session, select, func
 
 from app.core.config import settings
@@ -239,4 +239,63 @@ def download_enriched_csv():
         output_path,
         media_type="text/csv",
         filename="enriched_unilog_output.csv"
+    )
+
+@router.get("/records/{record_id}/export-pdf")
+def download_record_pdf(record_id: str, db: Session = Depends(get_session)):
+    """Generates and streams a PDF specification report for a single enriched record."""
+    from app.services.pdf_exporter import generate_product_pdf
+    
+    rec_uuid = uuid.UUID(record_id)
+    raw_record = db.get(UnilogRecord, rec_uuid)
+    if not raw_record:
+        raise HTTPException(status_code=404, detail="Record not found")
+        
+    enriched = db.exec(select(UnilogEnriched).where(UnilogEnriched.record_id == rec_uuid)).first()
+    enriched_data = enriched.enriched_data if enriched and enriched.enriched_data else {}
+    
+    record_info = {
+        "mfg_part_num": raw_record.mfg_part_num,
+        "part_desc": raw_record.part_desc,
+        "part_manuf": raw_record.part_manuf
+    }
+    
+    pdf_bytes = generate_product_pdf(enriched_data, record_info)
+    mpn = raw_record.mfg_part_num or "product"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=CatalogIQ_SpecSheet_{mpn}.pdf"}
+    )
+
+@router.get("/export-pdf")
+def download_batch_export_pdf(db: Session = Depends(get_session)):
+    """Generates and streams a PDF report for the latest enriched record."""
+    from app.services.pdf_exporter import generate_product_pdf
+    
+    enriched = db.exec(
+        select(UnilogEnriched)
+        .where(UnilogEnriched.status == UnilogStatus.enriched)
+        .order_by(UnilogEnriched.updated_at.desc())
+    ).first()
+    
+    if not enriched:
+        raise HTTPException(status_code=404, detail="No enriched records available for PDF export.")
+        
+    raw_record = db.get(UnilogRecord, enriched.record_id)
+    enriched_data = enriched.enriched_data or {}
+    record_info = {
+        "mfg_part_num": raw_record.mfg_part_num if raw_record else "",
+        "part_desc": raw_record.part_desc if raw_record else "",
+        "part_manuf": raw_record.part_manuf if raw_record else ""
+    }
+    
+    pdf_bytes = generate_product_pdf(enriched_data, record_info)
+    mpn = raw_record.mfg_part_num if raw_record else "catalog"
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=CatalogIQ_Enriched_Delivery_Report_{mpn}.pdf"}
     )

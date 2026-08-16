@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Database, AlertTriangle, FileText, CheckCircle2 } from 'lucide-react';
+import { Database, AlertTriangle, FileText, CheckCircle2, Download } from 'lucide-react';
 import { ValidationPanel } from './ValidationPanel';
 import { MultiSourceReconciliationPanel } from './MultiSourceReconciliationPanel';
 import { EnrichmentPanel } from './EnrichmentPanel';
@@ -205,9 +205,20 @@ export const ProductsShell: React.FC = () => {
           </button>
           <button
             onClick={handleRerunEnrichment}
-            className="px-3.5 py-2 bg-foreground text-background hover:bg-transparent hover:text-foreground text-white text-xs font-semibold rounded-lg transition"
+            className="px-3.5 py-2 bg-foreground text-background hover:bg-transparent hover:text-foreground text-xs font-semibold rounded-lg transition"
           >
             Re-enrich AI
+          </button>
+          <button
+            onClick={() => {
+              if (selectedProduct) {
+                window.open(`/api/v1/products/${selectedProduct.id}/export-pdf`, '_blank');
+              }
+            }}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export PDF</span>
           </button>
         </div>
       </div>
