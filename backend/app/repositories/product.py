@@ -38,7 +38,7 @@ class ProductRepository:
             conditions.append(Product.quality_score <= quality_score_max)
         if conditions:
             statement = statement.where(and_(*conditions))
-        statement = statement.order_by(Product.created_at.desc())
+        statement = statement.order_by(Product.updated_at.desc(), Product.created_at.desc())
         statement = statement.offset(offset).limit(limit)
         return list(self.session.exec(statement).all())
 

@@ -66,13 +66,10 @@ export const ProductsShell: React.FC = () => {
         const data: ProductItem[] = await res.json();
         setProducts(data);
         if (data.length > 0) {
-          let target = data[0];
+          let target = data[0]; // Automatically select the most recently processed PDF!
           if (paramProductId) {
             const paramMatch = data.find((p) => p.id === paramProductId);
             if (paramMatch) target = paramMatch;
-          } else if (selectedProduct) {
-            const currentMatch = data.find((p) => p.id === selectedProduct.id);
-            if (currentMatch) target = currentMatch;
           }
           selectProduct(target);
         }
