@@ -137,6 +137,7 @@ function App() {
               <Route element={<Layout />}>
                 <Route path="dashboard" element={<DashboardShell />} />
                 <Route path="catalog" element={<ProductsShell />} />
+                <Route path="products" element={<ProductsShell />} />
                 <Route path="upload" element={<UploadShell />} />
                 <Route path="jobs" element={<JobsShell />} />
                 <Route path="search" element={<SearchShell />} />

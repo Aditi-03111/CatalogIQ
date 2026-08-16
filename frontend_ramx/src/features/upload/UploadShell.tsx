@@ -627,7 +627,7 @@ export const UploadShell: React.FC = () => {
                 {jobDetail.status === 'completed' && (() => {
                   const extractedStep = jobDetail.steps?.find(s => s.product_id);
                   const pId = extractedStep?.product_id;
-                  const targetUrl = pId ? `/products?product_id=${pId}` : '/products';
+                  const targetUrl = pId ? `/catalog?product_id=${pId}` : '/catalog';
                   return (
                     <div className="flex items-center space-x-2">
                       <Link 
