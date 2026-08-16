@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth, useUser, SignOutButton } from '@clerk/clerk-react';
-import { Bell, Command, Search, Sun, Moon, LogOut } from 'lucide-react';
+import { Bell, Command, Search, Sun, Moon, LogOut, Maximize, Minimize } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { useTheme } from '../hooks/useTheme';
 
@@ -9,6 +9,27 @@ export const Layout: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error("Error enabling full-screen mode:", err);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   // Show loading state while Clerk is verifying auth status
   if (!isLoaded) {
@@ -37,7 +58,7 @@ export const Layout: React.FC = () => {
 
       <Sidebar />
       
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto z-10 bg-transparent relative">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto z-10 bg-transparent relative w-full h-full">
         <header className="h-16 border-b border-border px-8 flex items-center justify-between shrink-0 bg-background/80 backdrop-blur-md">
           <div className="flex items-center gap-3 min-w-0">
             <div className="hidden md:flex items-center gap-2 h-9 w-[360px] rounded-none border border-border bg-card px-3 text-muted-foreground">
@@ -52,6 +73,15 @@ export const Layout: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            {/* Fullscreen Toggle Button */}
+            <button 
+              onClick={toggleFullscreen}
+              className="w-9 h-9 rounded-none border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition flex items-center justify-center"
+              title={isFullscreen ? "Exit Fullscreen Mode" : "Enter Fullscreen Mode"}
+            >
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            </button>
+
             {/* Theme Toggle Button */}
             <button 
               onClick={toggleTheme}
@@ -94,7 +124,7 @@ export const Layout: React.FC = () => {
             </SignOutButton>
           </div>
         </header>
-        <div className="flex-1 p-6 lg:p-8 overflow-y-auto bg-transparent">
+        <div className="flex-1 p-6 lg:p-8 overflow-y-auto bg-transparent w-full h-full max-w-full">
           <Outlet />
         </div>
       </main>

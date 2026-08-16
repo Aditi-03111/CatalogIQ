@@ -76,51 +76,66 @@ export const Layout: React.FC = () => {
           {/* Action Button & User Actions */}
           <div className="flex items-center gap-5">
             
+            <span className="text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-none bg-[#9B8F77]/10 font-mono text-[#9B8F77] border border-[#9B8F77]/20">
+              Live Beta
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Fullscreen Toggle Button */}
             <button 
-              onClick={() => window.print()}
-              className="bg-[#111111] hover:bg-neutral-800 text-white text-[10px] font-bold px-5 py-2.5 rounded-full flex items-center gap-1.5 transition shadow-sm"
+              onClick={toggleFullscreen}
+              className="w-9 h-9 rounded-none border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition flex items-center justify-center"
+              title={isFullscreen ? "Exit Fullscreen Mode" : "Enter Fullscreen Mode"}
             >
-              <span>SAVE REPORT</span>
-              <span className="font-semibold text-xs leading-none">↗</span>
+              {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
             </button>
 
-            <button className="text-neutral-500 hover:text-[#111111] transition relative">
+            {/* Theme Toggle Button */}
+            <button 
+              onClick={toggleTheme}
+              className="w-9 h-9 rounded-none border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition flex items-center justify-center"
+              title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+
+            <button className="w-9 h-9 rounded-none border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition flex items-center justify-center">
               <Bell className="w-4 h-4" />
-              <span className="absolute top-0 right-0 w-1 h-1 bg-[#FF3B00] rounded-full" />
             </button>
-
+            
             {user?.imageUrl ? (
               <img 
                 src={user.imageUrl} 
-                alt={user.fullName || "User Avatar"} 
-                className="w-8 h-8 rounded-full object-cover border border-neutral-300 shadow-sm" 
+                alt={user.fullName || "User"} 
+                className="w-9 h-9 rounded-none border border-border object-cover" 
                 referrerPolicy="no-referrer" 
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-neutral-200 border border-neutral-300 flex items-center justify-center font-bold text-xs">
-                U
+              <div className="w-9 h-9 rounded-none border border-foreground bg-card flex items-center justify-center font-mono text-foreground text-xs font-medium">
+                {userInitials}
               </div>
             )}
+            
+            <span className="hidden sm:inline text-xs uppercase tracking-widest font-light text-muted-foreground">
+              {user?.fullName || "Catalog Manager"}
+            </span>
 
             <SignOutButton redirectUrl="/login">
               <button
                 onClick={() => localStorage.removeItem("token")}
-                className="text-neutral-500 hover:text-[#FF3B00] transition flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider"
+                className="h-9 px-3 rounded-none border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition flex items-center gap-2 text-[9px] uppercase tracking-widest font-semibold"
                 title="Sign out"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden lg:inline">Sign Out</span>
               </button>
             </SignOutButton>
-
           </div>
         </header>
-
-        {/* Floating Content Body */}
-        <main className="flex-1 p-12 overflow-y-auto bg-transparent">
+        <div className="flex-1 p-6 lg:p-8 overflow-y-auto bg-transparent w-full h-full max-w-full">
           <Outlet />
-        </main>
-
-      </div>
+        </div>
+      </main>
     </div>
   );
 };
