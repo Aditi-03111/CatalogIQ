@@ -19,6 +19,7 @@ class ProcessingStepResponse(BaseModel):
     error_message: Optional[str]
     created_at: datetime
     completed_at: Optional[datetime]
+    product_id: Optional[uuid.UUID] = None
 
     class Config:
         from_attributes = True

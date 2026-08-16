@@ -149,6 +149,7 @@ def check_ready(session: Session = Depends(get_session)) -> Dict[str, Any]:
             "redis": redis_status,
             "qdrant": qdrant_status,
         },
+        "clerk_publishable_key": settings.CLERK_PUBLISHABLE_KEY or ""
     }
 
 

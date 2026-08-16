@@ -126,7 +126,11 @@ class PipelineStage(ABC):
 class ParsingStage(PipelineStage):
     def __init__(self, parser: Optional[DocumentParser] = None):
         # Allow injecting custom test parser (MockParser) or default to runtime DoclingParser
-        self.parser = parser or DoclingParser()
+        if parser is not None:
+            self.parser = parser
+        else:
+            from app.workers.tasks.document_processing import get_parser
+            self.parser = get_parser()
 
     def execute(self, session: Session, document_id: uuid.UUID, job_id: uuid.UUID, step_id: uuid.UUID) -> None:
         document = session.get(Document, document_id)
@@ -212,7 +216,12 @@ class ParsingStage(PipelineStage):
 
         # 4. Invoke the parser
         try:
-            parsed_data = self.parser.parse(file_bytes)
+            import inspect
+            sig = inspect.signature(self.parser.parse)
+            if "filename" in sig.parameters:
+                parsed_data = self.parser.parse(file_bytes, filename=document.filename)
+            else:
+                parsed_data = self.parser.parse(file_bytes)
         except ValueError as e:
             raise NonRetryableProcessingError(f"Document format error: {e}")
         except Exception as e:
@@ -350,13 +359,18 @@ class TableExtractor:
             if not key_raw or not val_raw or key_raw.lower() in {"", "n/a", "-", "—"}:
                 continue
 
+            # Skip rows where key is a pure number or digit (e.g. "1", "4", "6", "8" from performance curve tables)
+            import re
+            if re.match(r"^\s*\d+(?:\.\d+)?\s*$", key_raw):
+                continue
+
             # Skip rows where key looks like a header repeat
             if key_raw.lower() in {str(h).lower() for h in headers}:
                 continue
 
             # Canonicalize attribute name
             attr_name = self._canonicalize_name(key_raw)
-            if not attr_name:
+            if not attr_name or len(attr_name) < 2:
                 continue
 
             # Build evidence_text from the row
@@ -388,15 +402,26 @@ class TableExtractor:
         Identifies which column is the "attribute name" and which is the "value".
         Returns (key_col_index, value_col_index) or (None, None) if unclear.
         """
+        import re
+
+        if not rows:
+            return None, None
+
+        # Check if first column is mostly numbers (e.g. 1, 4, 6, 8 performance curves)
+        first_col_values = [str(r[0]).strip() for r in rows if r and len(r) > 0]
+        numeric_keys = sum(1 for v in first_col_values if re.match(r"^\s*\d+(?:\.\d+)?\s*$", v))
+        if first_col_values and (numeric_keys / len(first_col_values)) > 0.4:
+            # Column 0 is numeric data points, not specification labels
+            return None, None
+
         # If no headers provided, check row widths
         if not headers:
-            # Check if rows consistently have 2 columns
             row_widths = [len(r) for r in rows[:5] if r]
             if row_widths and max(row_widths) == 2:
                 return 0, 1
             return None, None
 
-        # 2-column table is the clearest signal
+        # 2-column table with text labels in col 0 is a key-value spec table
         if len(headers) == 2:
             return 0, 1
 
@@ -627,6 +652,11 @@ class ExtractionStage(PipelineStage):
                 f"Re-normalizing existing product attributes and marking step as completed."
             )
             self._reprocess_existing_attributes(session, document_id)
+            from sqlmodel import select
+            from app.models import ProductDocumentAssociation
+            assoc = session.exec(select(ProductDocumentAssociation).where(ProductDocumentAssociation.document_id == document_id)).first()
+            if assoc:
+                step.product_id = assoc.product_id
             self._complete_step_and_job(session, step, job)
             return
 
@@ -690,6 +720,7 @@ class ExtractionStage(PipelineStage):
 
         # Associate document with product
         self._associate_document(session, product.id, document_id)
+        step.product_id = product.id
 
         # ---- 12. Persist attributes + evidence ----
         attr_repo = AttributeRepository(session)

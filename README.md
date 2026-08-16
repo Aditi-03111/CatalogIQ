@@ -11,8 +11,8 @@
 - Live activity feed showing document processing stages, recent products, and catalog quality alerts.
 
 ### 2. ⚡ Multi-Stage Ingestion & AI Processing Pipeline (`/upload`, `/jobs`)
-- **Multimodal Ingestion**: Supports single/bulk PDFs, PNG/JPG images, and multi-file ZIP archives.
-- **Multimodal OCR & Layout Analysis**: Structured text extraction, layout parsing, table extraction, and image region extraction.
+- **PDF Datasheet Ingestion**: Supports industrial PDF datasheets, technical specification sheets, and engineering documents up to 50MB in the current demo build.
+- **Layout Analysis**: Structured text extraction, layout parsing, table extraction, and page-level intermediate JSON output.
 - **LLM Attribute Extraction**: Contextual extraction of technical industrial attributes (e.g. rated power, voltage, enclosure rating, duty cycle).
 - **Confidence Scoring Engine**: Multi-factor scoring (0–100) combining base extraction signals, evidence verification bonuses, normalization success, and source trust multipliers.
 - **Evidence Provenance Grounding**: Verbatim evidence snippet extraction with page numbers, document source linking, and bounding boxes.
@@ -217,6 +217,25 @@ Run full backend test suite:
 ```powershell
 $env:PYTHONPATH="backend"; backend\venv\Scripts\python.exe -m pytest backend/tests -v
 ```
+
+On macOS / Linux:
+```bash
+PYTHONPATH=backend python -m pytest backend/tests -v
+```
+
+---
+
+## Demo Positioning
+
+For the hackathon problem statement, the strongest story is:
+
+1. Upload limited industrial product information, starting with PDF datasheets.
+2. Extract structured product specs and preserve page-level source evidence.
+3. Normalize and validate attributes with confidence scores and quality rules.
+4. Enrich the product with commerce descriptions, features, applications, and tags.
+5. Route conflicts or low-confidence values into a human review workflow before publishing.
+
+Planned expansion areas include direct website scraping, CSV supplier feed ingestion, image-only OCR, and bulk ZIP ingestion.
 
 Run specific test modules:
 ```powershell

@@ -25,7 +25,7 @@ class DocumentService:
 
     def validate_file(self, file_content: bytes, filename: str) -> None:
         """
-        Validates file extension, size limit, and PDF signature magic bytes.
+        Validates file extension and size limit. If it is a PDF, validates PDF signature.
         """
         # 1. Size validation
         max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
@@ -36,12 +36,14 @@ class DocumentService:
 
         # 2. Extension validation
         _, ext = os.path.splitext(filename.lower())
-        if ext != ".pdf":
-            raise ValueError("Unsupported file extension. Only PDF is supported.")
+        allowed_exts = {".pdf", ".xlsx", ".xls", ".docx", ".pptx", ".csv", ".txt", ".html", ".htm"}
+        if ext not in allowed_exts:
+            raise ValueError(f"Unsupported file extension {ext}. Supported formats: PDF, Word, Excel, CSV, PPTX, Text, HTML.")
 
         # 3. Magic bytes validation (PDF signature %PDF)
-        if not file_content.startswith(b"%PDF"):
-            raise ValueError("Invalid PDF format. Magic bytes do not match %PDF signature.")
+        if ext == ".pdf":
+            if not file_content.startswith(b"%PDF"):
+                raise ValueError("Invalid PDF format. Magic bytes do not match %PDF signature.")
 
     def upload_document(self, file_content: bytes, filename: str, mime_type: str) -> Dict[str, Any]:
         """

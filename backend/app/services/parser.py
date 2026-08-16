@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 class DocumentParser(ABC):
     @abstractmethod
-    def parse(self, file_content: bytes) -> Dict[str, Any]:
+    def parse(self, file_content: bytes, filename: Optional[str] = None) -> Dict[str, Any]:
         """
         Parses document binary content and returns a structured intermediate representation.
         """
@@ -30,14 +30,53 @@ class DoclingParser(DocumentParser):
                 "Ensure 'docling' is listed in requirements and installed."
             ) from e
 
-    def parse(self, file_content: bytes) -> Dict[str, Any]:
-        # Write binary stream to a temporary local file for Docling parser access
-        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+    def parse(self, file_content: bytes, filename: Optional[str] = None) -> Dict[str, Any]:
+        suffix = ".pdf"
+        if filename:
+            _, ext = os.path.splitext(filename)
+            if ext:
+                suffix = ext.lower()
+
+        if suffix == ".txt":
+            try:
+                text_str = file_content.decode("utf-8")
+            except UnicodeDecodeError:
+                text_str = file_content.decode("utf-8", errors="ignore")
+            return {
+                "pages": [
+                    {
+                        "page_number": 1,
+                        "text": text_str,
+                        "tables": [],
+                        "images": []
+                    }
+                ],
+                "metadata": {
+                    "page_count": 1,
+                    "title": filename or "Text Specification Document"
+                }
+            }
+
+        # Write binary stream to a temporary local file with the correct extension for Docling format detection
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(file_content)
             tmp_path = tmp.name
 
         try:
-            converter = self._converter_class()
+            from docling.datamodel.base_models import InputFormat
+            from docling.datamodel.pipeline_options import PdfPipelineOptions, AcceleratorOptions
+            from docling.document_converter import PdfFormatOption
+            
+            # Configure pipeline options to force CPU device to prevent prefork pool crashes on macOS
+            device_name = os.getenv("DOCLING_DEVICE", "cpu")
+            cpu_accel = AcceleratorOptions(num_threads=2, device=device_name)
+            pipeline_options = PdfPipelineOptions(accelerator_options=cpu_accel)
+            
+            converter = self._converter_class(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+                }
+            )
             result = converter.convert(tmp_path)
             doc = result.document
 
@@ -137,12 +176,14 @@ class MockParser(DocumentParser):
     def __init__(self):
         self.version = "1.0.0"
 
-    def parse(self, file_content: bytes) -> Dict[str, Any]:
+    def parse(self, file_content: bytes, filename: Optional[str] = None) -> Dict[str, Any]:
         """
         Mock implementation explicitly injected for tests (simulating a 2-page spec).
         """
         # Quick validation check on magic bytes to verify validation triggers in tests
-        if not file_content.startswith(b"%PDF"):
+        # We only check PDF magic bytes if filename is a PDF
+        is_pdf = filename.lower().endswith(".pdf") if filename else True
+        if is_pdf and not file_content.startswith(b"%PDF"):
             raise ValueError("Invalid PDF magic bytes")
 
         return {

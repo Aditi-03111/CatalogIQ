@@ -26,6 +26,13 @@ class ReprocessResponse(BaseModel):
     status: str
     reprocessed: bool
 
+class URLIngestRequest(BaseModel):
+    url: str
+
+class TextIngestRequest(BaseModel):
+    text: str
+    title: Optional[str] = None
+
 @router.get("/", response_model=List[Document])
 def list_documents(
     limit: int = 100,
@@ -75,6 +82,96 @@ def upload_document(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"File ingestion failed: {str(e)}"
+        )
+
+@router.post("/url", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
+def ingest_url(
+    payload: URLIngestRequest,
+    session: Session = Depends(get_session)
+):
+    import urllib.request
+    from urllib.parse import urlparse
+    
+    url = payload.url.strip()
+    if not (url.startswith("http://") or url.startswith("https://")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="URL must start with http:// or https://"
+        )
+
+    try:
+        parsed_url = urlparse(url)
+        domain = parsed_url.netloc.replace(":", "_").replace("/", "_") or "webpage"
+        filename = f"{domain}_{uuid.uuid4().hex[:6]}.html"
+
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            content = response.read()
+            
+        service = DocumentService(session)
+        res = service.upload_document(
+            file_content=content,
+            filename=filename,
+            mime_type="text/html"
+        )
+        return UploadResponse(
+            document_id=res["document_id"],
+            job_id=res.get("job_id"),
+            status=res["status"],
+            cached=res.get("cached", False)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"URL scraping failed: {str(e)}"
+        )
+
+@router.post("/text", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
+def ingest_text(
+    payload: TextIngestRequest,
+    session: Session = Depends(get_session)
+):
+    if not payload.text.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pasted text cannot be empty"
+        )
+
+    try:
+        title = payload.title.strip() if payload.title else "pasted_text"
+        title_slug = "".join([c if c.isalnum() else "_" for c in title])
+        filename = f"{title_slug}_{uuid.uuid4().hex[:6]}.txt"
+        content = payload.text.encode("utf-8")
+
+        service = DocumentService(session)
+        res = service.upload_document(
+            file_content=content,
+            filename=filename,
+            mime_type="text/plain"
+        )
+        return UploadResponse(
+            document_id=res["document_id"],
+            job_id=res.get("job_id"),
+            status=res["status"],
+            cached=res.get("cached", False)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Text ingestion failed: {str(e)}"
         )
 
 @router.post("/{document_id}/reprocess", response_model=ReprocessResponse)

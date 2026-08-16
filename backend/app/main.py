@@ -1,6 +1,7 @@
 import os
 os.environ["TORCH_COMPILE_DISABLE"] = "1"
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
@@ -11,6 +12,17 @@ from app.api.v1.jobs import router as jobs_router
 from app.api.v1.search import router as search_router
 from app.api.v1.overview import router as overview_router
 from app.api.v1.reviews import router as reviews_router
+from app.api.v1.auth import router as auth_router
+from app.api.v1.unilog import router as unilog_router
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Auto-create all tables (including the new users table) on startup
+    from app.db.session import engine
+    from sqlmodel import SQLModel
+    from app.models.user import User  # Ensure class registration
+    SQLModel.metadata.create_all(engine)
+    yield
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -18,6 +30,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # Configure CORS for local development (can be locked down in production via settings)
@@ -31,12 +44,14 @@ app.add_middleware(
 
 # Include API routers under /api/v1 prefix
 app.include_router(health_router, prefix="/api/v1", tags=["Health"])
+app.include_router(auth_router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(products_router, prefix="/api/v1", tags=["Products"])
 app.include_router(documents_router, prefix="/api/v1", tags=["Documents"])
 app.include_router(jobs_router, prefix="/api/v1", tags=["Jobs"])
 app.include_router(search_router, prefix="/api/v1", tags=["Search"])
 app.include_router(overview_router, prefix="/api/v1", tags=["Overview"])
 app.include_router(reviews_router, prefix="/api/v1", tags=["Reviews"])
+app.include_router(unilog_router, prefix="/api/v1/unilog", tags=["Unilog"])
 
 @app.get("/")
 def read_root():

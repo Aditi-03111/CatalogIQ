@@ -7,6 +7,8 @@ from .enrichment import EnrichmentResult, EnrichmentType, EnrichmentStatus
 from .processing import ProcessingJob, ProcessingStep, JobStatus, ProcessingStage, StepStatus
 from .knowledge import ProductVersion, CacheEntry, EmbeddingMetadata, CacheType, CacheStatus
 from .audit import AuditLog, DuplicateCandidate, ActorType, DuplicateStatus, DuplicateMethod
+from .user import User
+from .unilog import UnilogRecord, UnilogEnriched, UnilogStatus
 
 __all__ = [
     "Source", "SourceType",
@@ -17,5 +19,6 @@ __all__ = [
     "EnrichmentResult", "EnrichmentType", "EnrichmentStatus",
     "ProcessingJob", "ProcessingStep", "JobStatus", "ProcessingStage", "StepStatus",
     "ProductVersion", "CacheEntry", "EmbeddingMetadata", "CacheType", "CacheStatus",
-    "AuditLog", "DuplicateCandidate", "ActorType", "DuplicateStatus", "DuplicateMethod"
+    "AuditLog", "DuplicateCandidate", "ActorType", "DuplicateStatus", "DuplicateMethod",
+    "User", "UnilogRecord", "UnilogEnriched", "UnilogStatus"
 ]

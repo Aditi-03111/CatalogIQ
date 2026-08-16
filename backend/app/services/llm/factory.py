@@ -35,13 +35,13 @@ def get_llm_provider() -> BaseLLMProvider:
     provider_name = settings.LLM_PROVIDER.lower().strip()
 
     if provider_name == "mock":
-        if settings.ENV != "test":
+        if settings.ENV not in ["test", "development"]:
             raise ConfigurationError(
-                f"LLM_PROVIDER='mock' is only permitted when ENV='test'. "
+                f"LLM_PROVIDER='mock' is only permitted when ENV='test' or 'development'. "
                 f"Current ENV='{settings.ENV}'. "
                 f"Set LLM_PROVIDER=ollama or LLM_PROVIDER=gemini for non-test environments."
             )
-        logger.info("LLM provider: MockProvider (test environment)")
+        logger.info("LLM provider: MockProvider (offline playground environment)")
         from app.services.llm.mock_provider import MockProvider
         return MockProvider()
 

@@ -83,7 +83,7 @@ class GeminiProvider(BaseLLMProvider):
     def prompt_version(self) -> str:
         return self._prompt_version
 
-    def _call_gemini(self, user_prompt: str) -> str:
+    def _call_gemini(self, user_prompt: str, response_schema: Any = None) -> str:
         """
         Calls Gemini with system + user messages and returns the raw text response.
         Retries on transient errors (rate limits, 5xx).
@@ -97,6 +97,7 @@ class GeminiProvider(BaseLLMProvider):
                     contents=full_prompt,
                     config=self._types.GenerateContentConfig(
                         response_mime_type="application/json",
+                        response_schema=response_schema,
                         temperature=0.1,
                         max_output_tokens=4096,
                     ),
@@ -141,7 +142,7 @@ class GeminiProvider(BaseLLMProvider):
         """
         user_prompt = build_extraction_prompt(ir)
         logger.info(f"Sending extraction request to Gemini model: {self._model}")
-        raw_content = self._call_gemini(user_prompt)
+        raw_content = self._call_gemini(user_prompt, response_schema=ExtractionResult)
 
         try:
             raw_dict = json.loads(raw_content)
@@ -189,6 +190,7 @@ class GeminiProvider(BaseLLMProvider):
                 contents=full_prompt,
                 config=self._types.GenerateContentConfig(
                     response_mime_type="application/json",
+                    response_schema=CommerceEnrichment,
                     temperature=0.2,
                     max_output_tokens=4096,
                 ),

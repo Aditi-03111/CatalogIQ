@@ -201,13 +201,47 @@ class AttributeNormalizer:
             except ValueError:
                 pass
 
-        # Fallback: store as text if numeric parse fails
+        # Try parsing trade fraction format (e.g. "50-1/4 in", "1 1/2 in", "1/2 in")
+        fraction_match = re.match(
+            r"^\s*(?:(\d+)[\s\-])?(\d+\/\d+)\s*([a-zA-Z°%/]+)?\s*$", raw
+        )
+        if fraction_match:
+            whole_str, frac_str, raw_unit = fraction_match.group(1), fraction_match.group(2), fraction_match.group(3)
+            try:
+                num, den = map(int, frac_str.split("/"))
+                frac_val = num / den
+                whole_val = int(whole_str) if whole_str else 0
+                total_val = round(whole_val + frac_val, 4)
+                if total_val == int(total_val):
+                    total_val = int(total_val)
+                resolved_unit = _standardize_unit(raw_unit or hint_unit)
+                return NormalizationResult(
+                    normalized_value=total_val,
+                    unit=resolved_unit,
+                    data_type="numeric",
+                    success=True,
+                )
+            except (ValueError, ZeroDivisionError):
+                pass
+
+        # Fallback: strip unit if present to leave clean text value
+        clean_val = raw
+        resolved_unit = _standardize_unit(hint_unit)
+        unit_match = re.match(r"^(.+?)\s*([a-zA-Z°%/]+)$", raw)
+        if unit_match:
+            possible_val, possible_unit = unit_match.group(1).strip(), unit_match.group(2).strip()
+            if possible_unit.lower() in _UNIT_ALIASES:
+                std_u = _standardize_unit(possible_unit)
+                if std_u:
+                    clean_val = possible_val
+                    resolved_unit = std_u
+
         return NormalizationResult(
-            normalized_value=raw,
-            unit=_standardize_unit(hint_unit),
+            normalized_value=clean_val,
+            unit=resolved_unit,
             data_type="text",
             success=False,
-            error=f"Could not parse '{raw}' as numeric",
+            error=f"Could not parse '{raw}' as pure numeric float",
         )
 
     def _normalize_boolean(self, raw: str) -> NormalizationResult:

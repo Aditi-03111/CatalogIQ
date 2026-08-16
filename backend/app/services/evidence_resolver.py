@@ -69,12 +69,13 @@ class EvidenceResolver:
         ir: Dict[str, Any],
     ) -> ExtractionResult:
         """
-        Verify all attributes in the ExtractionResult against the IR corpus.
+        Verify all attributes in the ExtractionResult against individual pages.
 
         Modifies each RawAttributeItem in-place:
           - Sets evidence_verified = True if evidence_text found in IR.
+          - Dynamically updates page_number if found on a different page than claimed.
           - Downgrades extraction_method from "llm" → "llm_inference" if
-            evidence_text is empty or not found in IR.
+            evidence_text is empty or not found on any page.
 
         Args:
             result: The ExtractionResult from the LLM provider.
@@ -83,12 +84,23 @@ class EvidenceResolver:
         Returns:
             The same ExtractionResult with updated attribute evidence flags.
         """
-        corpus = _build_ir_corpus(ir)
+        pages_text: List[str] = []
+        for page in ir.get("pages", []):
+            parts = [page.get("text", "") or ""]
+            for table in page.get("tables", []):
+                for header in table.get("headers", []):
+                    parts.append(str(header))
+                for row in table.get("rows", []):
+                    for cell in row:
+                        parts.append(str(cell))
+            pages_text.append(_normalize_text(" ".join(parts)))
+
+        corpus = " ".join(pages_text)
         resolved_count = 0
         downgraded_count = 0
 
         for attr in result.attributes:
-            attr = self._resolve_attribute(attr, corpus)
+            attr = self._resolve_attribute(attr, pages_text, corpus)
             if attr.evidence_verified:
                 resolved_count += 1
             elif attr.extraction_method == "llm_inference":
@@ -102,10 +114,10 @@ class EvidenceResolver:
         return result
 
     def _resolve_attribute(
-        self, attr: RawAttributeItem, corpus: str
+        self, attr: RawAttributeItem, pages_text: List[str], corpus: str
     ) -> RawAttributeItem:
         """
-        Verify a single attribute's evidence against the IR corpus.
+        Verify a single attribute's evidence against the IR pages.
         """
         # llm_inference by definition has no evidence — never verified
         if attr.extraction_method == "llm_inference":
@@ -116,15 +128,20 @@ class EvidenceResolver:
         # verify that at least the raw_value appears in the corpus
         if attr.extraction_method == "deterministic":
             raw_norm = _normalize_text(attr.raw_value)
-            if raw_norm and raw_norm in corpus:
+            raw_no_spaces = raw_norm.replace(" ", "")
+            if raw_norm and (raw_norm in corpus or (raw_no_spaces and raw_no_spaces in corpus.replace(" ", ""))):
                 attr.evidence_verified = True
             else:
-                # Value not found — unusual but possible (e.g., normalized differently)
-                logger.warning(
-                    f"Deterministic attribute '{attr.name}' raw_value '{attr.raw_value}' "
-                    f"not found verbatim in IR corpus. Setting evidence_verified=False."
-                )
-                attr.evidence_verified = False
+                # Value not found — check if numeric part alone is in corpus
+                num_match = re.search(r"\d+(?:\.\d+)?", raw_norm)
+                if num_match and num_match.group(0) in corpus:
+                    attr.evidence_verified = True
+                else:
+                    logger.warning(
+                        f"Deterministic attribute '{attr.name}' raw_value '{attr.raw_value}' "
+                        f"not found verbatim in IR corpus. Setting evidence_verified=False."
+                    )
+                    attr.evidence_verified = False
             return attr
 
         # llm: verify that the claimed evidence_text quote exists in the IR
@@ -142,28 +159,43 @@ class EvidenceResolver:
                 return attr
 
             evidence_norm = _normalize_text(evidence)
-            # Require at least a 3-word overlap or the full normalized quote
-            if evidence_norm in corpus:
-                attr.evidence_verified = True
-            else:
-                # Try partial match: all meaningful words present in corpus.
-                # Strip pipe separators used in table evidence ('Key | Value' format)
-                # and split into individual tokens for word-level overlap check.
+            
+            def check_page(page_text_norm: str) -> bool:
+                if evidence_norm in page_text_norm:
+                    return True
+                
+                # Token overlap fallback (minimum 80% word matches on a single page)
                 import re as _re
-                evidence_tokens = [t for t in _re.split(r'[|\s]+', evidence_norm) if len(t) >= 2]
-                if len(evidence_tokens) >= 2 and all(t in corpus for t in evidence_tokens):
+                tokens = [t for t in _re.split(r'[\|\s\.,;\-\(\):/]+', evidence_norm) if len(t) >= 2]
+                if not tokens:
+                    return False
+                matched = [t for t in tokens if t in page_text_norm]
+                return len(tokens) >= 2 and len(matched) / len(tokens) >= 0.80
+
+            # 1. Check claimed page first
+            p_num = attr.page_number
+            if p_num and 1 <= p_num <= len(pages_text):
+                if check_page(pages_text[p_num - 1]):
+                    attr.evidence_verified = True
+                    return attr
+
+            # 2. Check other pages and correct page number dynamically if found
+            for idx, p_text in enumerate(pages_text):
+                if check_page(p_text):
+                    attr.page_number = idx + 1
                     attr.evidence_verified = True
                     logger.debug(
-                        f"LLM attribute '{attr.name}': partial token match for evidence "
-                        f"'{attr.evidence_text[:60]}'"
+                        f"LLM attribute '{attr.name}': corrected page number to {idx + 1} based on evidence match."
                     )
-                else:
-                    logger.warning(
-                        f"LLM attribute '{attr.name}': evidence text not found in IR corpus. "
-                        f"Downgrading from 'llm' \u2192 'llm_inference'. "
-                        f"Evidence: '{attr.evidence_text[:60]}'"
-                    )
-                    attr.extraction_method = "llm_inference"
-                    attr.evidence_verified = False
+                    return attr
+
+            # 3. Not found anywhere
+            logger.warning(
+                f"LLM attribute '{attr.name}': evidence text not found in any IR page. "
+                f"Downgrading from 'llm' → 'llm_inference'. "
+                f"Evidence: '{attr.evidence_text[:60]}'"
+            )
+            attr.extraction_method = "llm_inference"
+            attr.evidence_verified = False
 
         return attr

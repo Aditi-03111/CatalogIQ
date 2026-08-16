@@ -1,5 +1,10 @@
 import os
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load .env file into os.environ for system-wide visibility
+load_dotenv()
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -42,6 +47,10 @@ class Settings(BaseSettings):
     # --- Gemini (production) ---
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-3.6-flash"
+
+    # --- Clerk Authentication Keys ---
+    CLERK_PUBLISHABLE_KEY: Optional[str] = None
+    CLERK_SECRET_KEY: Optional[str] = None
 
     # --- Embedding ---
     EMBEDDING_PROVIDER: str = "fastembed"

@@ -65,8 +65,13 @@ class ConfidenceScore:
         self.bonuses = bonuses
         self.penalties = penalties
         # Derive status from score
-        high = settings.CONFIDENCE_THRESHOLD_HIGH * 100  # convert 0.85 → 85
-        medium = settings.CONFIDENCE_THRESHOLD_MEDIUM * 100  # convert 0.60 → 60
+        high = settings.CONFIDENCE_THRESHOLD_HIGH
+        if high <= 1.0:
+            high = high * 100
+        medium = settings.CONFIDENCE_THRESHOLD_MEDIUM
+        if medium <= 1.0:
+            medium = medium * 100
+
         if self.score >= high:
             self.status = AttributeStatus.verified
         elif self.score >= medium:
@@ -182,8 +187,13 @@ class ConfidenceCalculator:
             AttributeStatus enum value.
         """
         score = score_float * 100
-        high = settings.CONFIDENCE_THRESHOLD_HIGH * 100
-        medium = settings.CONFIDENCE_THRESHOLD_MEDIUM * 100
+        high = settings.CONFIDENCE_THRESHOLD_HIGH
+        if high <= 1.0:
+            high = high * 100
+        medium = settings.CONFIDENCE_THRESHOLD_MEDIUM
+        if medium <= 1.0:
+            medium = medium * 100
+
         if score >= high:
             return AttributeStatus.verified
         if score >= medium:

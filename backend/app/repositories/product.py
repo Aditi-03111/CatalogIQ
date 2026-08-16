@@ -38,6 +38,7 @@ class ProductRepository:
             conditions.append(Product.quality_score <= quality_score_max)
         if conditions:
             statement = statement.where(and_(*conditions))
+        statement = statement.order_by(Product.created_at.desc())
         statement = statement.offset(offset).limit(limit)
         return list(self.session.exec(statement).all())
 
@@ -54,8 +55,14 @@ class ProductRepository:
         return product
 
     def get_attributes(self, product_id: uuid.UUID) -> List[ProductAttribute]:
+        import re
         statement = select(ProductAttribute).where(ProductAttribute.product_id == product_id)
-        return list(self.session.exec(statement).all())
+        attrs = list(self.session.exec(statement).all())
+        return [
+            a for a in attrs
+            if not re.match(r"^\s*\d+(?:\.\d+)?\s*$", a.attribute_name or "")
+            and not re.match(r"^\s*\d+(?:\.\d+)?\s*$", a.display_name or "")
+        ]
 
     def get_validations(self, product_id: uuid.UUID, status: Optional[str] = None) -> List[ValidationResult]:
         statement = select(ValidationResult).where(ValidationResult.product_id == product_id)
