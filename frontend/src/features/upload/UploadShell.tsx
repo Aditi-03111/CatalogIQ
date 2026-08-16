@@ -625,19 +625,18 @@ export const UploadShell: React.FC = () => {
                 )}
 
                 {jobDetail.status === 'completed' && (() => {
-                  const extractedStep = jobDetail.steps.find(s => s.product_id);
+                  const extractedStep = jobDetail.steps?.find(s => s.product_id);
                   const pId = extractedStep?.product_id;
+                  const targetUrl = pId ? `/products?product_id=${pId}` : '/products';
                   return (
-                    <>
-                      {pId && (
-                        <Link 
-                          to={`/products?product_id=${pId}`}
-                          className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg text-sm hover:bg-emerald-500 flex items-center space-x-1.5 transition mr-2"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          <span>View Extracted Catalog</span>
-                        </Link>
-                      )}
+                    <div className="flex items-center space-x-2">
+                      <Link 
+                        to={targetUrl}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg text-sm flex items-center space-x-1.5 transition"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>View Product Catalog Details</span>
+                      </Link>
 
                       <button 
                         onClick={handleForceReprocess}
@@ -659,7 +658,7 @@ export const UploadShell: React.FC = () => {
                         )}
                         <span>View Intermediate JSON</span>
                       </button>
-                    </>
+                    </div>
                   );
                 })()}
               </div>
