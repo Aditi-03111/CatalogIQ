@@ -24,5 +24,4 @@ services:
 databases:
   - name: catalogiq-db
     databaseName: catalogiq
-    user: postgres
     region: singapore
