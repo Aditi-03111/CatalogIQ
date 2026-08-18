@@ -57,6 +57,32 @@ class DoclingParser(DocumentParser):
                 }
             }
 
+        if suffix == ".pdf":
+            try:
+                import pypdf
+                import io
+                reader = pypdf.PdfReader(io.BytesIO(file_content))
+                extracted_pages: List[Dict[str, Any]] = []
+                for idx, page in enumerate(reader.pages):
+                    page_text = page.extract_text() or ""
+                    extracted_pages.append({
+                        "page_number": idx + 1,
+                        "text": page_text,
+                        "tables": [],
+                        "images": []
+                    })
+                if extracted_pages and any(p["text"].strip() for p in extracted_pages):
+                    logger.info(f"Fast PDF extraction completed via pypdf for {filename or 'PDF'} ({len(extracted_pages)} pages)")
+                    return {
+                        "pages": extracted_pages,
+                        "metadata": {
+                            "page_count": len(extracted_pages),
+                            "title": filename or "PDF Specification Document"
+                        }
+                    }
+            except Exception as pdf_err:
+                logger.warning(f"pypdf extraction notice: {pdf_err}. Falling back to Docling converter.")
+
         # Write binary stream to a temporary local file with the correct extension for Docling format detection
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
             tmp.write(file_content)
