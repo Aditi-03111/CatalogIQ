@@ -121,8 +121,9 @@ class DocumentService:
 
         # Trigger background Celery worker task execution
         # (We import here to prevent circular import boundaries)
+        from app.workers.celery_app import safe_dispatch_task
         from app.workers.tasks.document_processing import process_document_task
-        process_document_task.delay(str(doc_id), str(job_id), str(step_id))
+        safe_dispatch_task(process_document_task, str(doc_id), str(job_id), str(step_id))
 
         return {
             "document_id": document.id,
@@ -167,8 +168,9 @@ class DocumentService:
         self.session.commit()
 
         # Trigger background execution
+        from app.workers.celery_app import safe_dispatch_task
         from app.workers.tasks.document_processing import process_document_task
-        process_document_task.delay(str(document_id), str(job_id), str(step_id))
+        safe_dispatch_task(process_document_task, str(document_id), str(job_id), str(step_id))
 
         return {
             "document_id": document.id,
@@ -227,8 +229,9 @@ class DocumentService:
         self.session.add(step)
         self.session.commit()
 
+        from app.workers.celery_app import safe_dispatch_task
         from app.workers.tasks.document_processing import process_document_task
-        process_document_task.delay(str(doc.id), str(job_id), str(step_id))
+        safe_dispatch_task(process_document_task, str(doc.id), str(job_id), str(step_id))
 
         return {
             "document_id": doc.id,

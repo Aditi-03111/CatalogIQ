@@ -25,3 +25,20 @@ celery_app.conf.update(
     task_time_limit=300,       # 5 minutes absolute limit
     task_soft_time_limit=180   # 3 minutes soft limit
 )
+
+import logging
+logger = logging.getLogger(__name__)
+
+def safe_dispatch_task(task, *args):
+    """
+    Safely dispatch a task. Guarantees immediate execution via task.apply() so document jobs
+    never get stuck in Queued status waiting for external worker processes.
+    """
+    try:
+        task.apply(args=args)
+    except Exception as err:
+        logger.warning(f"Task apply notice ({err}). Attempting async broker dispatch via delay().")
+        try:
+            task.delay(*args)
+        except Exception as delay_err:
+            logger.error(f"Task dispatch failed: {delay_err}")

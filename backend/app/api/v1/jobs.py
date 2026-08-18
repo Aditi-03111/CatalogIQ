@@ -113,7 +113,8 @@ def retry_job(job_id: uuid.UUID, session: Session = Depends(get_session)):
     session.commit()
 
     # Re-trigger the background Celery worker task execution
+    from app.workers.celery_app import safe_dispatch_task
     from app.workers.tasks.document_processing import process_document_task
-    process_document_task.delay(str(step.document_id), str(job_id), str(step.id))
+    safe_dispatch_task(process_document_task, str(step.document_id), str(job_id), str(step.id))
 
     return {"message": "Job retry scheduled successfully", "job_id": job_id}

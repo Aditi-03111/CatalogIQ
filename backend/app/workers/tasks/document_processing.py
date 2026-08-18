@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from celery.exceptions import Retry
 from sqlmodel import Session
 
-from app.workers.celery_app import celery_app
+from app.workers.celery_app import celery_app, safe_dispatch_task
 from app.db.session import engine
 from app.models import (
     Document, DocumentStatus, ProcessingJob, ProcessingStep,
@@ -106,8 +106,8 @@ def process_document_task(self, document_id_str: str, job_id_str: str, step_id_s
             session.commit()
 
             extraction_step = _create_extraction_step(session, job_id, doc_id)
-            extract_document_task.delay(
-                document_id_str, job_id_str, str(extraction_step.id)
+            safe_dispatch_task(
+                extract_document_task, document_id_str, job_id_str, str(extraction_step.id)
             )
             return
 
@@ -121,8 +121,8 @@ def process_document_task(self, document_id_str: str, job_id_str: str, step_id_s
             session.refresh(document)
             if document.status == DocumentStatus.processed:
                 extraction_step = _create_extraction_step(session, job_id, doc_id)
-                extract_document_task.delay(
-                    document_id_str, job_id_str, str(extraction_step.id)
+                safe_dispatch_task(
+                    extract_document_task, document_id_str, job_id_str, str(extraction_step.id)
                 )
                 logger.info(
                     f"[Stage 2: Extraction] Queued for Doc: {doc_id}, "
@@ -230,7 +230,7 @@ def extract_document_task(
 
             # Trigger Stage 3: Validation
             val_step = _create_validation_step(session, job_id, doc_id)
-            validate_document_task.delay(document_id_str, job_id_str, str(val_step.id))
+            safe_dispatch_task(validate_document_task, document_id_str, job_id_str, str(val_step.id))
             logger.info(f"[Stage 3: Validation] Queued for Doc: {doc_id}, Step: {val_step.id}")
 
         except ExtractionConfigurationError as e:
@@ -310,7 +310,7 @@ def validate_document_task(
 
             # Trigger Stage 4: Enrichment
             enrich_step = _create_enrichment_step(session, job_id, doc_id)
-            enrich_document_task.delay(document_id_str, job_id_str, str(enrich_step.id))
+            safe_dispatch_task(enrich_document_task, document_id_str, job_id_str, str(enrich_step.id))
             logger.info(f"[Stage 4: Enrichment] Queued for Doc: {doc_id}, Step: {enrich_step.id}")
 
         except Exception as e:
