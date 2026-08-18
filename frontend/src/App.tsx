@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
@@ -63,52 +63,9 @@ const FetchInterceptor: React.FC<{ children: React.ReactNode }> = ({ children })
   return <>{children}</>;
 };
 
-// Falls back to a local storage override input in case key in .env file is missing/empty
-const ClerkConfigPage = () => {
-  const [customKeyInput, setCustomKeyInput] = useState('');
-  
-  const saveCustomPublishableKey = () => {
-    const trimmed = customKeyInput.trim();
-    if (!trimmed) return;
-    localStorage.setItem("clerk_publishable_key_override", trimmed);
-    localStorage.removeItem("token");
-    window.location.reload();
-  };
-
-  return (
-    <div className="min-h-screen w-screen flex flex-col justify-center items-center p-6 bg-background text-foreground relative overflow-hidden">
-      <div className="absolute top-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full glow-1 blur-[120px] pointer-events-none z-0" />
-      <div className="absolute bottom-[-10%] left-[10%] w-[55vw] h-[55vw] rounded-full glow-2 blur-[150px] pointer-events-none z-0" />
-
-      <div className="w-full max-w-sm bg-card border border-border p-8 z-10 shadow-2xl space-y-6 text-center">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-normal font-serif">CatalogIQ</h1>
-          <p className="text-xs text-muted-foreground">Configure Clerk Authentication to proceed.</p>
-        </div>
-        
-        <div className="space-y-3 text-left">
-          <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono block">Clerk Publishable Key</label>
-          <input
-            type="text"
-            placeholder="pk_test_..."
-            value={customKeyInput}
-            onChange={(e) => setCustomKeyInput(e.target.value)}
-            className="w-full bg-background border border-border text-foreground px-3 py-2 text-xs outline-none focus:border-foreground transition font-mono animate-none"
-          />
-          <button
-            onClick={saveCustomPublishableKey}
-            disabled={!customKeyInput.trim()}
-            className="w-full bg-foreground text-background text-xs font-semibold py-2.5 hover:opacity-90 transition disabled:opacity-50"
-          >
-            Apply Key & Initialize
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const queryClient = new QueryClient();
+
+const DEFAULT_CLERK_KEY = "pk_test_Y2xlcmsuY2F0YWxvZ2lxLmRldiQ";
 
 function App() {
   // Resolve publishable key synchronously
@@ -117,11 +74,7 @@ function App() {
   
   const publishableKey = (envKey && envKey !== 'your_clerk_publishable_key_here') 
     ? envKey 
-    : savedKey;
-
-  if (!publishableKey) {
-    return <ClerkConfigPage />;
-  }
+    : (savedKey || DEFAULT_CLERK_KEY);
 
   return (
     <ClerkProvider publishableKey={publishableKey}>

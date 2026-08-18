@@ -29,25 +29,17 @@ export const LoginPage: React.FC = () => {
     const fetchConfig = async () => {
       try {
         const res = await fetch('/api/v1/health/ready');
-        if (!res.ok) throw new Error("Failed to fetch connection details");
-        const data = await res.json();
-        
-        const key = data.clerk_publishable_key;
-        if (key && key !== 'your_clerk_publishable_key_here') {
-          setClerkKey(key);
-        } else {
-          // If env has placeholder, check localStorage override
-          const savedOverride = localStorage.getItem("clerk_publishable_key_override");
-          if (savedOverride) {
-            setClerkKey(savedOverride);
-          } else {
-            setShowManualInput(true);
+        if (res.ok) {
+          const data = await res.json();
+          const key = data.clerk_publishable_key;
+          if (key && key !== 'your_clerk_publishable_key_here') {
+            setClerkKey(key);
           }
         }
       } catch (err) {
         console.error("Config fetch error:", err);
-        setShowManualInput(true);
       } finally {
+        setShowManualInput(false);
         setLoadingConfig(false);
       }
     };
