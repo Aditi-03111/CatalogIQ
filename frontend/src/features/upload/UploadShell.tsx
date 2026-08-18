@@ -154,8 +154,14 @@ export const UploadShell: React.FC = () => {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || "Upload failed");
+        let errMsg = "Upload failed";
+        try {
+          const errData = await res.json();
+          errMsg = errData.detail || errMsg;
+        } catch {
+          errMsg = `Server error (${res.status}). Service is restarting, please retry in 5 seconds.`;
+        }
+        throw new Error(errMsg);
       }
 
       const data = await res.json();

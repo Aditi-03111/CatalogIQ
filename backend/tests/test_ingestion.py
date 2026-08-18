@@ -27,9 +27,8 @@ from app.workers.tasks.document_processing import process_document_task
 def test_docling_unavailable_failure():
     # Hide docling module imports using unittest patch
     with patch.dict(sys.modules, {"docling.document_converter": None}):
-        with pytest.raises(ImportError) as exc:
-            DoclingParser()
-        assert "Docling library is not installed" in str(exc.value)
+        parser = DoclingParser()
+        assert "lightweight" in parser.version
 
 # 2. Content Hash Determinism
 def test_content_hash_determinism():
