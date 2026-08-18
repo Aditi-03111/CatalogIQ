@@ -124,11 +124,12 @@ class DocumentService:
         from app.workers.celery_app import safe_dispatch_task
         from app.workers.tasks.document_processing import process_document_task
         safe_dispatch_task(process_document_task, str(doc_id), str(job_id), str(step_id))
+        self.session.refresh(job)
 
         return {
             "document_id": document.id,
             "job_id": job.id,
-            "status": "queued",
+            "status": job.status or "completed",
             "cached": False
         }
 
@@ -171,11 +172,12 @@ class DocumentService:
         from app.workers.celery_app import safe_dispatch_task
         from app.workers.tasks.document_processing import process_document_task
         safe_dispatch_task(process_document_task, str(document_id), str(job_id), str(step_id))
+        self.session.refresh(job)
 
         return {
             "document_id": document.id,
             "job_id": job.id,
-            "status": "queued",
+            "status": job.status or "completed",
             "reprocessed": True
         }
 
@@ -232,10 +234,11 @@ class DocumentService:
         from app.workers.celery_app import safe_dispatch_task
         from app.workers.tasks.document_processing import process_document_task
         safe_dispatch_task(process_document_task, str(doc.id), str(job_id), str(step_id))
+        self.session.refresh(job)
 
         return {
             "document_id": doc.id,
             "job_id": job.id,
-            "status": "queued",
+            "status": job.status or "completed",
             "cached": False
         }
