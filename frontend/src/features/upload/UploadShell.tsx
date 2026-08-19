@@ -273,22 +273,7 @@ export const UploadShell: React.FC = () => {
     }
   };
 
-  // Trigger retry on failed job
-  const handleRetry = async () => {
-    if (!jobId) return;
-    setError(null);
-    try {
-      const res = await fetch(`/api/v1/jobs/${jobId}/retry`, { method: "POST" });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.detail || "Retry trigger failed");
-      }
-      // Re-trigger polling
-      setJobDetail(prev => prev ? { ...prev, status: 'queued' } : null);
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
+
 
   // Force reprocess document
   const handleForceReprocess = async () => {
@@ -620,13 +605,13 @@ export const UploadShell: React.FC = () => {
               </button>
 
               <div className="flex space-x-2">
-                {jobDetail.status === 'failed' && (
+                {jobDetail.status !== 'completed' && (
                   <button 
-                    onClick={handleRetry}
-                    className="px-4 py-2 bg-warning text-warning-foreground font-medium rounded-lg text-sm hover:opacity-90 flex items-center space-x-1.5 transition"
+                    onClick={handleForceReprocess}
+                    className="px-4 py-2 bg-foreground text-background font-semibold rounded-lg text-sm hover:opacity-90 flex items-center space-x-1.5 transition"
                   >
-                    <RefreshCw className="w-4 h-4 animate-spin-reverse" />
-                    <span>Retry Pipeline</span>
+                    <RefreshCw className="w-4 h-4 animate-spin-slow" />
+                    <span>Force Reprocess Document</span>
                   </button>
                 )}
 

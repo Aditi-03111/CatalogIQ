@@ -59,6 +59,21 @@ def get_job(job_id: uuid.UUID, session: Session = Depends(get_session)):
             detail=f"Job with ID {job_id} not found"
         )
     
+    # Auto-healing mechanism: if a job is in 'queued' status when polled, 
+    # execute pipeline stages inline so it NEVER remains stuck in queued status.
+    if job.status in [JobStatus.queued, "queued"]:
+        stmt = select(ProcessingStep).where(ProcessingStep.job_id == job_id).order_by(ProcessingStep.created_at.desc())
+        latest_step = session.exec(stmt).first()
+        if latest_step and latest_step.document_id:
+            try:
+                from app.workers.tasks.document_processing import process_document_task
+                from app.workers.celery_app import safe_dispatch_task
+                safe_dispatch_task(process_document_task, str(latest_step.document_id), str(job.id), str(latest_step.id))
+                session.refresh(job)
+            except Exception as err:
+                import logging
+                logging.getLogger(__name__).error(f"Auto-completion failed for job {job_id}: {err}")
+
     # Retrieve steps associated with this job
     stmt = select(ProcessingStep).where(ProcessingStep.job_id == job_id).order_by(ProcessingStep.created_at.asc())
     steps = session.exec(stmt).all()
