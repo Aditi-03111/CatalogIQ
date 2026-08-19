@@ -42,6 +42,7 @@ import hashlib
 import json
 import logging
 import uuid
+import base64
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -212,7 +213,23 @@ class ParsingStage(PipelineStage):
         try:
             file_bytes = storage.download_file(document.storage_key)
         except Exception as e:
-            raise TransientProcessingError(f"Failed to download original document from store: {e}")
+            backup_b64 = (document.metadata_json or {}).get("original_file_b64")
+            if backup_b64:
+                try:
+                    file_bytes = base64.b64decode(backup_b64.encode("ascii"))
+                    storage.upload_file(file_bytes, document.storage_key)
+                    logger.info("Restored missing original document from database backup: %s", document.storage_key)
+                except Exception as backup_err:
+                    raise TransientProcessingError(
+                        f"Failed to restore original document backup: {backup_err}"
+                    ) from backup_err
+            elif isinstance(e, FileNotFoundError) or "not found" in str(e).lower():
+                raise NonRetryableProcessingError(
+                    "Original document file is missing from deployment storage and no database backup exists. "
+                    "Please re-upload this PDF once to restore it, then process again."
+                ) from e
+            else:
+                raise TransientProcessingError(f"Failed to download original document from store: {e}") from e
 
         # 4. Invoke the parser
         try:
@@ -1392,4 +1409,3 @@ class DocumentProcessingService:
         Runs Stage 4: Enrichment.
         """
         self.enrichment_stage.execute(self.session, document_id, job_id, step_id)
-

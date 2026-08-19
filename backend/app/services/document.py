@@ -2,6 +2,7 @@ import uuid
 import hashlib
 import os
 import logging
+import base64
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from sqlmodel import Session, select, and_
@@ -60,6 +61,11 @@ class DocumentService:
         # Check for existing document in database
         existing_doc = self.doc_repo.get_by_file_hash(file_hash)
         if existing_doc:
+            try:
+                self._restore_existing_original(existing_doc, file_content, filename, mime_type)
+            except IntegrityError:
+                self.session.rollback()
+                logger.warning("Skipped duplicate-upload storage repair due to concurrent database update.")
             return self._handle_existing_document(existing_doc)
 
         # If new, create document, job, and step within a transaction block
@@ -78,7 +84,8 @@ class DocumentService:
             file_hash=file_hash,
             mime_type=mime_type,
             file_size=len(file_content),
-            status=DocumentStatus.uploaded
+            status=DocumentStatus.uploaded,
+            metadata_json=self._build_original_backup_metadata(file_content)
         )
 
         job_id = uuid.uuid4()
@@ -128,6 +135,42 @@ class DocumentService:
             "cached": False
         }
 
+    def _build_original_backup_metadata(self, file_content: bytes) -> Dict[str, Any]:
+        """
+        Keeps a DB-backed copy of the original upload for single-service Render
+        deployments where local disk can disappear after restarts/redeploys.
+        """
+        return {
+            "original_file_b64": base64.b64encode(file_content).decode("ascii"),
+            "original_backup_encoding": "base64",
+        }
+
+    def _restore_existing_original(
+        self,
+        document: Document,
+        file_content: bytes,
+        filename: str,
+        mime_type: str,
+    ) -> None:
+        _, ext = os.path.splitext(filename.lower())
+        storage_key = document.storage_key or f"documents/original/{document.id}{ext or '.bin'}"
+        if not os.path.splitext(storage_key)[1] and ext:
+            storage_key = f"{storage_key}{ext}"
+
+        self.storage.upload_file(file_content, storage_key)
+        metadata = dict(document.metadata_json or {})
+        metadata.update(self._build_original_backup_metadata(file_content))
+
+        document.filename = filename or document.filename
+        document.mime_type = mime_type or document.mime_type
+        document.file_size = len(file_content)
+        document.storage_key = storage_key
+        document.storage_backend = settings.STORAGE_PROVIDER
+        document.metadata_json = metadata
+        document.updated_at = datetime.now(timezone.utc)
+        self.session.add(document)
+        self.session.commit()
+
     def force_reprocess(self, document_id: uuid.UUID) -> Dict[str, Any]:
         """
         Creates a new ProcessingJob and ProcessingStep, forcing reprocessing of an
@@ -136,6 +179,20 @@ class DocumentService:
         document = self.doc_repo.get_by_id(document_id)
         if not document:
             raise ValueError(f"Document with ID {document_id} not found")
+
+        # Restore local storage file from DB backup if deleted by container restart
+        try:
+            self.storage.download_file(document.storage_key)
+        except Exception:
+            backup_b64 = (document.metadata_json or {}).get("original_file_b64")
+            if backup_b64:
+                try:
+                    import base64
+                    file_bytes = base64.b64decode(backup_b64.encode("ascii"))
+                    self.storage.upload_file(file_bytes, document.storage_key)
+                    logger.info("Restored missing storage file from DB backup in force_reprocess for doc %s", document_id)
+                except Exception as restore_err:
+                    logger.warning("Could not restore storage file in force_reprocess: %s", restore_err)
 
         # Set status back to uploaded to prepare for execution
         document.status = DocumentStatus.uploaded
