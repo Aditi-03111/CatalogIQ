@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     EXTRACTION_SCHEMA_VERSION: str = "v1"
     PIPELINE_VERSION: str = "v1"
 
+    # --- Processing Runtime ---
+    # inline: FastAPI BackgroundTasks in the web service (best for Render free/single-service deploys)
+    # celery: external Celery worker + Redis broker
+    PROCESSING_MODE: str = "inline"
+
     WORKER_CONCURRENCY: int = 4
     MAX_UPLOAD_SIZE_MB: int = 50
     CONFIDENCE_THRESHOLD_HIGH: float = 0.85  # 85/100 — verified

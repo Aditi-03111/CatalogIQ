@@ -64,7 +64,8 @@ class DocumentService:
 
         # If new, create document, job, and step within a transaction block
         doc_id = uuid.uuid4()
-        storage_key = f"documents/original/{doc_id}.pdf"
+        _, ext = os.path.splitext(filename.lower())
+        storage_key = f"documents/original/{doc_id}{ext or '.bin'}"
         
         # Write binary file to object storage
         self.storage.upload_file(file_content, storage_key)
@@ -119,16 +120,10 @@ class DocumentService:
         self.session.refresh(document)
         self.session.refresh(job)
 
-        # Trigger background Celery worker task execution
-        # (We import here to prevent circular import boundaries)
-        from app.workers.celery_app import safe_dispatch_task
-        from app.workers.tasks.document_processing import process_document_task
-        safe_dispatch_task(process_document_task, str(doc_id), str(job_id), str(step_id))
-        self.session.refresh(job)
-
         return {
             "document_id": document.id,
             "job_id": job.id,
+            "step_id": step.id,
             "status": job.status or "completed",
             "cached": False
         }
@@ -168,15 +163,10 @@ class DocumentService:
         self.session.add(step)
         self.session.commit()
 
-        # Trigger background execution
-        from app.workers.celery_app import safe_dispatch_task
-        from app.workers.tasks.document_processing import process_document_task
-        safe_dispatch_task(process_document_task, str(document_id), str(job_id), str(step_id))
-        self.session.refresh(job)
-
         return {
             "document_id": document.id,
             "job_id": job.id,
+            "step_id": step.id,
             "status": job.status or "completed",
             "reprocessed": True
         }
@@ -194,6 +184,7 @@ class DocumentService:
             return {
                 "document_id": doc.id,
                 "job_id": job_id,
+                "step_id": latest_step.id if latest_step else None,
                 "status": "already_processed",
                 "cached": True
             }
@@ -202,6 +193,7 @@ class DocumentService:
             return {
                 "document_id": doc.id,
                 "job_id": job_id,
+                "step_id": latest_step.id if latest_step else None,
                 "status": "processing",
                 "cached": True
             }
@@ -231,14 +223,10 @@ class DocumentService:
         self.session.add(step)
         self.session.commit()
 
-        from app.workers.celery_app import safe_dispatch_task
-        from app.workers.tasks.document_processing import process_document_task
-        safe_dispatch_task(process_document_task, str(doc.id), str(job_id), str(step_id))
-        self.session.refresh(job)
-
         return {
             "document_id": doc.id,
             "job_id": job.id,
+            "step_id": step.id,
             "status": job.status or "completed",
             "cached": False
         }

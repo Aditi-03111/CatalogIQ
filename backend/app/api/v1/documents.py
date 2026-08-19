@@ -1,7 +1,7 @@
 import uuid
 import json
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, BackgroundTasks
 from sqlmodel import Session
 from pydantic import BaseModel
 
@@ -9,9 +9,23 @@ from app.db.session import get_session
 from app.models import Document
 from app.repositories import DocumentRepository
 from app.services.document import DocumentService
+from app.services.processing_runner import run_document_pipeline
 from app.services.storage import get_storage_service
 
 router = APIRouter(prefix="/documents")
+
+
+def _schedule_processing(background_tasks: BackgroundTasks, result: Dict[str, Any]) -> None:
+    if not result.get("job_id") or not result.get("step_id"):
+        return
+    if str(result.get("status", "")).lower() in {"already_processed", "completed"}:
+        return
+    background_tasks.add_task(
+        run_document_pipeline,
+        result["document_id"],
+        result["job_id"],
+        result["step_id"],
+    )
 
 # Typed upload response
 class UploadResponse(BaseModel):
@@ -56,6 +70,7 @@ def get_document(document_id: uuid.UUID, session: Session = Depends(get_session)
 
 @router.post("/upload", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
 def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     session: Session = Depends(get_session)
 ):
@@ -67,6 +82,7 @@ def upload_document(
             filename=file.filename,
             mime_type=file.content_type or "application/pdf"
         )
+        _schedule_processing(background_tasks, res)
         return UploadResponse(
             document_id=res["document_id"],
             job_id=res.get("job_id"),
@@ -87,6 +103,7 @@ def upload_document(
 @router.post("/url", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
 def ingest_url(
     payload: URLIngestRequest,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
     import urllib.request
@@ -117,6 +134,7 @@ def ingest_url(
             filename=filename,
             mime_type="text/html"
         )
+        _schedule_processing(background_tasks, res)
         return UploadResponse(
             document_id=res["document_id"],
             job_id=res.get("job_id"),
@@ -137,6 +155,7 @@ def ingest_url(
 @router.post("/text", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
 def ingest_text(
     payload: TextIngestRequest,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
     if not payload.text.strip():
@@ -157,6 +176,7 @@ def ingest_text(
             filename=filename,
             mime_type="text/plain"
         )
+        _schedule_processing(background_tasks, res)
         return UploadResponse(
             document_id=res["document_id"],
             job_id=res.get("job_id"),
@@ -177,11 +197,13 @@ def ingest_text(
 @router.post("/{document_id}/reprocess", response_model=ReprocessResponse)
 def reprocess_document(
     document_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session)
 ):
     service = DocumentService(session)
     try:
         res = service.force_reprocess(document_id)
+        _schedule_processing(background_tasks, res)
         return ReprocessResponse(
             document_id=res["document_id"],
             job_id=res["job_id"],

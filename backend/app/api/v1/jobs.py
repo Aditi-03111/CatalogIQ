@@ -1,12 +1,13 @@
 import uuid
 from typing import List, Optional
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timezone, timedelta
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlmodel import Session, select
 from pydantic import BaseModel
 
 from app.db.session import get_session
 from app.models import ProcessingJob, ProcessingStep, JobStatus, StepStatus
+from app.services.processing_runner import run_document_pipeline
 
 router = APIRouter(prefix="/jobs")
 
@@ -51,7 +52,11 @@ def list_jobs(
     return list(session.exec(statement).all())
 
 @router.get("/{job_id}", response_model=ProcessingJobDetail)
-def get_job(job_id: uuid.UUID, session: Session = Depends(get_session)):
+def get_job(
+    job_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session)
+):
     job = session.get(ProcessingJob, job_id)
     if not job:
         raise HTTPException(
@@ -59,20 +64,26 @@ def get_job(job_id: uuid.UUID, session: Session = Depends(get_session)):
             detail=f"Job with ID {job_id} not found"
         )
     
-    # Auto-healing mechanism: if a job is in 'queued' status when polled, 
-    # execute pipeline stages inline so it NEVER remains stuck in queued status.
-    if job.status in [JobStatus.queued, "queued"]:
+    # Auto-healing mechanism: if a job is queued or stale in processing when
+    # polled, enqueue the web-process runner so it does not stay frozen forever.
+    job_updated_at = job.updated_at
+    if job_updated_at and job_updated_at.tzinfo is None:
+        job_updated_at = job_updated_at.replace(tzinfo=timezone.utc)
+    is_stale_processing = (
+        job.status in [JobStatus.processing, "processing"]
+        and job_updated_at is not None
+        and job_updated_at < datetime.now(timezone.utc) - timedelta(minutes=2)
+    )
+    if job.status in [JobStatus.queued, "queued"] or is_stale_processing:
         stmt = select(ProcessingStep).where(ProcessingStep.job_id == job_id).order_by(ProcessingStep.created_at.desc())
         latest_step = session.exec(stmt).first()
         if latest_step and latest_step.document_id:
-            try:
-                from app.workers.tasks.document_processing import process_document_task
-                from app.workers.celery_app import safe_dispatch_task
-                safe_dispatch_task(process_document_task, str(latest_step.document_id), str(job.id), str(latest_step.id))
-                session.refresh(job)
-            except Exception as err:
-                import logging
-                logging.getLogger(__name__).error(f"Auto-completion failed for job {job_id}: {err}")
+            background_tasks.add_task(
+                run_document_pipeline,
+                latest_step.document_id,
+                job.id,
+                latest_step.id,
+            )
 
     # Retrieve steps associated with this job
     stmt = select(ProcessingStep).where(ProcessingStep.job_id == job_id).order_by(ProcessingStep.created_at.asc())
@@ -90,7 +101,11 @@ def get_job(job_id: uuid.UUID, session: Session = Depends(get_session)):
     )
 
 @router.post("/{job_id}/retry")
-def retry_job(job_id: uuid.UUID, session: Session = Depends(get_session)):
+def retry_job(
+    job_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session)
+):
     job = session.get(ProcessingJob, job_id)
     if not job:
         raise HTTPException(
@@ -127,9 +142,6 @@ def retry_job(job_id: uuid.UUID, session: Session = Depends(get_session)):
     session.add(step)
     session.commit()
 
-    # Re-trigger the background Celery worker task execution
-    from app.workers.celery_app import safe_dispatch_task
-    from app.workers.tasks.document_processing import process_document_task
-    safe_dispatch_task(process_document_task, str(step.document_id), str(job_id), str(step.id))
+    background_tasks.add_task(run_document_pipeline, step.document_id, job_id, step.id)
 
     return {"message": "Job retry scheduled successfully", "job_id": job_id}

@@ -1,12 +1,33 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, Navigate, Link, useLocation } from 'react-router-dom';
 import { useAuth, useUser, SignOutButton } from '@clerk/clerk-react';
-import { Bell, LogOut, Loader2 } from 'lucide-react';
+import { Bell, LogOut, Loader2, Maximize, Minimize, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../hooks/useTheme';
 
 export const Layout: React.FC = () => {
   const location = useLocation();
+  const { theme, toggleTheme } = useTheme();
   const { isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error("Error enabling full-screen mode:", err);
+      });
+    } else if (document.exitFullscreen) {
+      document.exitFullscreen();
+    }
+  };
 
   // Show loading state while Clerk is verifying auth status
   if (!isLoaded) {
@@ -29,6 +50,10 @@ export const Layout: React.FC = () => {
     { name: 'REPORTS', path: '/unilog' },
     { name: 'ANALYTICS', path: '/jobs' },
   ];
+
+  const userInitials = user?.fullName
+    ? user.fullName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+    : "CM";
 
   return (
     <div className="min-h-screen w-screen bg-[#111111] flex items-center justify-center p-4 lg:p-8 overflow-hidden relative font-sans bg-[radial-gradient(ellipse_at_left,_var(--tw-gradient-stops))] from-red-950/40 via-[#161616] to-[#0A0A0A]">
@@ -135,7 +160,7 @@ export const Layout: React.FC = () => {
         <div className="flex-1 p-6 lg:p-8 overflow-y-auto bg-transparent w-full h-full max-w-full">
           <Outlet />
         </div>
-      </main>
+      </div>
     </div>
   );
 };

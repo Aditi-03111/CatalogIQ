@@ -27,19 +27,21 @@ async def lifespan(app: FastAPI):
         import logging
         logging.warning(f"Database table setup: {e}")
 
-    # Automatically start embedded Celery worker thread to process queued Redis jobs
-    import threading
-    def start_celery_worker():
-        try:
-            from app.workers.celery_app import celery_app
-            worker = celery_app.Worker(concurrency=2, loglevel="INFO")
-            worker.start()
-        except Exception as err:
-            import logging
-            logging.warning(f"Embedded worker startup notice: {err}")
+    if settings.PROCESSING_MODE.lower() == "celery":
+        # Celery is opt-in for deployments that provide Redis and a real worker.
+        import threading
 
-    t = threading.Thread(target=start_celery_worker, daemon=True)
-    t.start()
+        def start_celery_worker():
+            try:
+                from app.workers.celery_app import celery_app
+                worker = celery_app.Worker(concurrency=2, loglevel="INFO")
+                worker.start()
+            except Exception as err:
+                import logging
+                logging.warning(f"Embedded worker startup notice: {err}")
+
+        t = threading.Thread(target=start_celery_worker, daemon=True)
+        t.start()
     yield
 
 app = FastAPI(

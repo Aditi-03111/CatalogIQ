@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { SignIn, SignOutButton, useAuth, useUser } from '@clerk/clerk-react';
 import plantImage from '../../assets/ramx_industrial_plant.png';
 

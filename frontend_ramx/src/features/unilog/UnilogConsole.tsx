@@ -4,12 +4,9 @@ import {
   Download,
   Database,
   Play,
-  CheckCircle,
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Activity,
-  FileText,
   ShieldCheck,
   UserCheck
 } from 'lucide-react';
@@ -90,7 +87,7 @@ export const UnilogConsole: React.FC = () => {
 
   // Poll status while background processing is active
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isProcessing) {
       interval = setInterval(() => {
         fetchStatusAndData();
