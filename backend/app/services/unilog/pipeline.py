@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.models.unilog import UnilogRecord, UnilogEnriched, UnilogStatus
-from app.services.unilog.normalizers import clean_brand_manufacturer, format_value_with_uom
+from app.services.unilog.normalizers import clean_brand_manufacturer, format_value_with_uom, clean_uom
 from app.services.unilog.prompts import (
     UNILOG_SYSTEM_PROMPT,
     UNILOG_FEW_SHOT_EXAMPLES,

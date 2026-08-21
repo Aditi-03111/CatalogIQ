@@ -223,6 +223,19 @@ On macOS / Linux:
 PYTHONPATH=backend python -m pytest backend/tests -v
 ```
 
+### Ground-Truth Accuracy & Format Compliance Evaluation
+
+1. **Format Compliance Verification**:
+   ```bash
+   PYTHONPATH=backend python backend/app/scripts/verify_compliance.py --input data/ground_truth_eval_output.csv
+   ```
+
+2. **Field-Level Accuracy Scoring**:
+   ```bash
+   PYTHONPATH=backend python backend/app/scripts/score_accuracy.py --actual data/ground_truth_eval_output.csv --expected "data/Unihack_ Expected Output - Delivery Format.csv" --output-diff data/accuracy_report.csv
+   ```
+   Evaluates field-by-field accuracy across all 252 delivery format columns, outputs overall exact & case-insensitive accuracy, and outputs a detailed per-field diff report to `data/accuracy_report.csv`.
+
 ---
 
 ## Demo Positioning
