@@ -32,14 +32,25 @@ export const JobsShell: React.FC = () => {
   const fetchDocuments = async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await fetch("/api/v1/documents/");
-      if (!res.ok) throw new Error("Failed to fetch documents list");
+      if (!res.ok) {
+        const text = await res.text();
+        try {
+          const errData = JSON.parse(text);
+          throw new Error(errData.detail || `Server returned HTTP ${res.status}`);
+        } catch {
+          throw new Error(`Server temporarily unavailable (HTTP ${res.status}). Render free instance may be spinning up — please click Refresh in a few seconds.`);
+        }
+      }
       const data: DocumentInfo[] = await res.json();
-      // Sort by created_at desc
-      data.sort((a, b) => (parseApiDate(b.created_at)?.getTime() || 0) - (parseApiDate(a.created_at)?.getTime() || 0));
-      setDocuments(data);
+      if (Array.isArray(data)) {
+        // Sort by created_at desc
+        data.sort((a, b) => (parseApiDate(b.created_at)?.getTime() || 0) - (parseApiDate(a.created_at)?.getTime() || 0));
+        setDocuments(data);
+      }
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Could not retrieve documents list.");
     } finally {
       setLoading(false);
     }

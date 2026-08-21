@@ -1,7 +1,12 @@
 export const parseApiDate = (isoString?: string | null) => {
   if (!isoString) return null;
-  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(isoString);
-  return new Date(hasTimezone ? isoString : `${isoString}Z`);
+  try {
+    const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(isoString);
+    const date = new Date(hasTimezone ? isoString : `${isoString}Z`);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
 };
 
 export const formatApiDateTime = (isoString?: string | null) => {
