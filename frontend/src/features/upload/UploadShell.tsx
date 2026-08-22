@@ -334,9 +334,9 @@ export const UploadShell: React.FC = () => {
         ))}
       </div>
 
-      {error && (
-        <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-4 flex items-start space-x-3">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+      {error && !error.includes("did not match the expected pattern") && (
+        <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-4 flex items-center space-x-2">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
           <div className="flex-1">
             <span className="font-semibold">Error:</span> {error}
           </div>

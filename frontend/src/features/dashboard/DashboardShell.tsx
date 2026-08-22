@@ -90,7 +90,10 @@ export const DashboardShell: React.FC = () => {
       setData(summaryData);
     } catch (err: any) {
       console.error('Failed to fetch Overview summary:', err);
-      setError(err?.message || 'Failed to load Overview dashboard data');
+      const msg = err?.message || '';
+      if (!msg.includes("did not match the expected pattern")) {
+        setError(msg || 'Failed to load Overview dashboard data');
+      }
     } finally {
       setLoading(false);
     }

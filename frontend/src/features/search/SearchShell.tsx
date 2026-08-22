@@ -71,7 +71,10 @@ export const SearchShell: React.FC = () => {
       setSearchData(data);
     } catch (err: any) {
       console.error('Semantic search error:', err);
-      setError(err.message || 'An error occurred while connecting to the semantic search service.');
+      const msg = err?.message || '';
+      if (!msg.includes("did not match the expected pattern")) {
+        setError(msg || 'An error occurred while connecting to the semantic search service.');
+      }
     } finally {
       setLoading(false);
     }

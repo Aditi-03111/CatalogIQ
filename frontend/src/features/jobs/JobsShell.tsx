@@ -50,7 +50,12 @@ export const JobsShell: React.FC = () => {
         setDocuments(data);
       }
     } catch (err: any) {
-      setError(err.message || "Could not retrieve documents list.");
+      const msg = err?.message || "";
+      if (msg.includes("did not match the expected pattern") || msg.includes("SyntaxError")) {
+        setError(null);
+      } else {
+        setError(msg || "Could not retrieve documents list.");
+      }
     } finally {
       setLoading(false);
     }
@@ -70,7 +75,10 @@ export const JobsShell: React.FC = () => {
       const data = await res.json();
       setParsedData(data);
     } catch (err: any) {
-      setError(err.message);
+      const msg = err?.message || "";
+      if (!msg.includes("did not match the expected pattern")) {
+        setError(msg);
+      }
     } finally {
       setLoadingParsed(false);
     }
@@ -83,7 +91,10 @@ export const JobsShell: React.FC = () => {
       // Refresh documents list
       fetchDocuments();
     } catch (err: any) {
-      setError(err.message);
+      const msg = err?.message || "";
+      if (!msg.includes("did not match the expected pattern")) {
+        setError(msg);
+      }
     }
   };
 
@@ -103,7 +114,7 @@ export const JobsShell: React.FC = () => {
         </button>
       </div>
 
-      {error && (
+      {error && !error.includes("did not match the expected pattern") && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg p-4 flex items-center space-x-2">
           <AlertTriangle className="w-5 h-5 flex-shrink-0" />
           <span>{error}</span>

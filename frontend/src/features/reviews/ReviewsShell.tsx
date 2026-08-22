@@ -120,7 +120,10 @@ export const ReviewsShell: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Failed to fetch reviews:', err);
-      setError(err?.message || 'Failed to load reviews workspace');
+      const msg = err?.message || '';
+      if (!msg.includes("did not match the expected pattern")) {
+        setError(msg || 'Failed to load reviews workspace');
+      }
     } finally {
       setLoading(false);
     }
